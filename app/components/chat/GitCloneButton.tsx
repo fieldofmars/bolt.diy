@@ -1,4 +1,6 @@
 import ignore from 'ignore';
+import { isBinary } from 'istextorbinary';
+import { Buffer } from 'node:buffer';
 import { useGit } from '~/lib/hooks/useGit';
 import type { Message } from 'ai';
 import { detectProjectCommands, createCommandsMessage, escapeBoltTags } from '~/utils/projectCommands';
@@ -79,7 +81,7 @@ export default function GitCloneButton({ importChat, className }: GitCloneButton
           // Skip binary files
           if (
             content instanceof Uint8Array &&
-            !filePath.match(/\.(txt|md|astro|mjs|js|jsx|ts|tsx|json|html|css|scss|less|yml|yaml|xml|svg|vue|svelte)$/i)
+            isBinary(filePath, Buffer.from(content))
           ) {
             skippedFiles.push(filePath);
             continue;
