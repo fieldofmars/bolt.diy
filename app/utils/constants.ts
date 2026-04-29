@@ -144,4 +144,12 @@ export const STARTER_TEMPLATES: Template[] = [
     tags: ['solidjs'],
     icon: 'i-bolt:solidjs',
   },
+  {
+    name: 'Shiny WebR',
+    label: 'Shiny (WebR)',
+    description: 'Shiny starter template that runs natively in the browser using webR and Shinylive',
+    githubRepo: 'bolt-shinylive-template',
+    tags: ['shiny', 'r', 'webr', 'data-science'],
+    icon: 'i-bolt:shiny',
+  },
 ];

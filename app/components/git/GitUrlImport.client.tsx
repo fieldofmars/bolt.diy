@@ -52,7 +52,23 @@ export function GitUrlImport() {
       const ig = ignore().add(IGNORE_PATTERNS);
 
       try {
-        const { workdir, data } = await gitClone(repoUrl);
+        let workdir = '/home/project';
+        let data: Record<string, any> = {};
+
+        // Intercept virtual templates that don't exist on GitHub
+        if (repoUrl.includes('bolt-shinylive-template')) {
+          const response = await fetch('/api/github-template?repo=bolt-shinylive-template');
+          if (!response.ok) throw new Error('Failed to fetch virtual template');
+          const files = await response.json();
+          for (const file of files) {
+            data[file.path] = { data: file.content, encoding: 'utf8' };
+          }
+          workdir = '/home/project'; // Default bolt workdir
+        } else {
+          const result = await gitClone(repoUrl);
+          workdir = result.workdir;
+          data = result.data;
+        }
 
         if (importChat) {
           const filePaths = Object.keys(data).filter((filePath) => !ig.ignores(filePath));

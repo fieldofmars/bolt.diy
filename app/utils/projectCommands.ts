@@ -66,7 +66,7 @@ export async function detectProjectCommands(files: FileContent[]): Promise<Proje
       const availableCommand = preferredCommands.find((cmd) => scripts[cmd]);
 
       // Build setup command with non-interactive handling
-      let baseSetupCommand = 'npx update-browserslist-db@latest && npm install';
+      let baseSetupCommand = 'npm install';
 
       // Add shadcn init if it's a shadcn project
       if (isShadcnProject) {
@@ -94,6 +94,14 @@ export async function detectProjectCommands(files: FileContent[]): Promise<Proje
       console.error('Error parsing package.json:', error);
       return { type: '', setupCommand: '', followupMessage: '' };
     }
+  }
+
+  if (hasFile('app.R') || hasFile('ui.R') || hasFile('server.R')) {
+    return {
+      type: 'Shiny',
+      startCommand: 'npx --yes serve . -p 5173',
+      followupMessage: 'Found a Shiny application. Starting a static server to run it via webR...',
+    };
   }
 
   if (hasFile('index.html')) {

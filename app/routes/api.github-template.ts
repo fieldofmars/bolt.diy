@@ -209,6 +209,192 @@ export async function loader({ request, context }: { request: Request; context: 
     return json({ error: 'Repository name is required' }, { status: 400 });
   }
 
+  if (repo === 'bolt-shinylive-template') {
+    return json([
+      {
+        name: 'package.json',
+        path: 'package.json',
+        content: `{
+  "name": "bolt-shinylive-template",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "lz-string": "^1.5.0"
+  }
+}`
+      },
+      {
+        name: 'server.js',
+        path: 'server.js',
+        content: `import http from 'http';
+import fs from 'fs/promises';
+import path from 'path';
+import LZString from 'lz-string';
+
+const PORT = 5173;
+
+async function getFiles(dir, baseDir = '') {
+  let results = [];
+  try {
+    const list = await fs.readdir(dir, { withFileTypes: true });
+    for (const file of list) {
+      if (['node_modules', '.git', 'server.js', 'package.json', 'package-lock.json', '.bolt'].includes(file.name)) continue;
+      const fullPath = path.join(dir, file.name);
+      const relPath = path.join(baseDir, file.name).replace(/\\\\/g, '/');
+      if (file.isDirectory()) {
+        results = results.concat(await getFiles(fullPath, relPath));
+      } else {
+        const content = await fs.readFile(fullPath, 'utf8');
+        results.push({ name: relPath, content });
+      }
+    }
+  } catch(e) {
+    console.error('Error reading directory:', e);
+  }
+  return results;
+}
+
+http.createServer(async (req, res) => {
+  if (req.url === '/') {
+    try {
+      const files = await getFiles(process.cwd());
+      
+      // Compress files into a shinylive URL payload
+      const payload = JSON.stringify(files);
+      const compressed = LZString.compressToEncodedURIComponent(payload);
+      const iframeUrl = \`https://shinylive.io/r/app/#code=\${compressed}\`;
+
+      const html = \`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Shiny WebR App</title>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100vh; overflow: hidden; font-family: sans-serif; background-color: #f8f9fa; }
+        iframe { width: 100%; height: 100%; border: none; display: block; }
+        .fallback { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 4px; text-decoration: none; font-size: 14px; z-index: 1000; }
+        .fallback:hover { background: rgba(0,0,0,0.9); }
+    </style>
+</head>
+<body>
+    <a href="\${iframeUrl}" target="_blank" class="fallback">Open in New Tab (If preview is blank)</a>
+    <iframe src="\${iframeUrl}" allow="fullscreen"></iframe>
+    <script>
+        console.log("Shiny App Initialized!");
+        console.log("Total files bundled: \${files.length}");
+        console.log("If the screen is white, click the 'Open in New Tab' button in the top right.");
+    </script>
+</body>
+</html>\`;
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(500);
+      res.end(e.message);
+    }
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+}).listen(PORT, () => {
+  console.log('Server running at http://localhost:' + PORT);
+});`
+      },
+      {
+        name: 'global.R',
+        path: 'global.R',
+        content: `library(shiny)
+
+# Source functions
+source("R/functions.R")
+
+# Load data if needed
+# my_data <- read.csv("data/dataset.csv")
+
+# Global variables
+app_title <- "Shiny WebR App (Multi-file)"
+`
+      },
+      {
+        name: 'ui.R',
+        path: 'ui.R',
+        content: `fluidPage(
+  titlePanel(app_title),
+  sidebarLayout(
+    sidebarPanel(
+      sliderInput("bins", "Number of bins:", min = 1, max = 50, value = 30)
+    ),
+    mainPanel(
+      plotOutput("distPlot")
+    )
+  )
+)
+`
+      },
+      {
+        name: 'server.R',
+        path: 'server.R',
+        content: `function(input, output, session) {
+  output$distPlot <- renderPlot({
+    x <- faithful[, 2]
+    bins <- seq(min(x), max(x), length.out = input$bins + 1)
+    
+    # Use function from R/functions.R
+    custom_hist(x, bins, "Waiting time to next eruption (in mins)")
+  })
+}
+`
+      },
+      {
+        name: 'functions.R',
+        path: 'R/functions.R',
+        content: `# Helper functions for the Shiny app
+custom_hist <- function(x, bins, xlab) {
+  hist(x, breaks = bins, col = 'steelblue', border = 'white',
+       xlab = xlab,
+       main = 'Histogram')
+}
+`
+      },
+      {
+        name: 'dataset.csv',
+        path: 'data/dataset.csv',
+        content: `id,value
+1,10
+2,20
+3,30`
+      },
+      {
+        name: 'test_basic.R',
+        path: 'tests/test_basic.R',
+        content: `library(testthat)
+
+test_that("dummy test", {
+  expect_equal(1 + 1, 2)
+})`
+      },
+      {
+        name: 'prompt',
+        path: '.bolt/prompt',
+        content: `You are an expert R developer building a Shiny application.
+This project uses Posit's webR and Shinylive to run natively in the browser.
+
+IMPORTANT RULES:
+1. ONLY write R code for the application logic. DO NOT write React, Vue, or Javascript components for the UI.
+2. Follow the multi-file Shiny paradigm: \`ui.R\`, \`server.R\`, and \`global.R\`.
+3. Place helper functions in the \`R/\` directory.
+4. Place data files in the \`data/\` directory.
+5. Place tests in the \`tests/\` directory.
+6. DO NOT modify \`server.js\` or \`package.json\`. These are required to serve the app to the browser natively via webR.
+7. NEVER execute \`R\`, \`Rscript\`, or \`R -e\` commands in the terminal (like \`shiny::runApp('.')\`). WebContainers run Node.js, not native R. The app starts automatically via \`npm run dev\` (\`node server.js\`).`
+      }
+    ]);
+  }
+
   try {
     // Access environment variables from Cloudflare context or process.env
     const githubToken =
